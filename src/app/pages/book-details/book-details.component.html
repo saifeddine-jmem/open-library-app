@@ -86,9 +86,9 @@
               <div class="line-horizontal absolute bottom-0 left-0 right-0" style="animation-delay: 0.8s"></div>
             </div>
 
-            <!-- Subjects -->
+            <!-- Topics -->
             <div *ngIf="book.subjects && book.subjects.length > 0" class="mb-8">
-              <h3 class="text-sm font-semibold text-slate-400 mb-3">Subjects</h3>
+              <h3 class="text-sm font-semibold text-slate-400 mb-3">Topics</h3>
               <div class="flex flex-wrap gap-2">
                 <span *ngFor="let subject of book.subjects.slice(0, 10)" class="px-3 py-1 bg-slate-700/50 border border-slate-600 text-slate-300 rounded text-xs">
                   {{ subject }}
