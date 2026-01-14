@@ -1,0 +1,120 @@
+<section class="py-16 px-6">
+  <div class="container mx-auto">
+    <!-- Section Header -->
+    <div class="mb-12 text-center pb-6 relative" *ngIf="filteredBooks.length > 0">
+      <div class="line-horizontal absolute bottom-0 left-1/4 right-1/4" style="animation-delay: 0.5s"></div>
+      <h2 class="text-4xl font-bold text-white mb-3 underline-animate">Featured Books</h2>
+      <p class="text-slate-400">
+        Showing <span class="text-blue-400 font-semibold">{{ filteredBooks.length }}</span> of
+        <span class="text-blue-400 font-semibold">{{ booksList.length }}</span> books
+      </p>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="filteredBooks.length === 0" class="text-center py-16">
+      <p class="text-2xl text-slate-400 mb-4">📭 No books found</p>
+      <p class="text-slate-500">Try adjusting your search criteria</p>
+    </div>
+
+    <!-- Books Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+      <div
+        *ngFor="let book of filteredBooks; let i = index"
+        (click)="viewBookDetails(book)"
+        class="group cursor-pointer h-full animate-slide-up glow-card"
+        [style.animation-delay]="(i * 50) + 'ms'"
+      >
+        <div class="h-full bg-secondary/30 border border-slate-700 rounded-xl overflow-hidden hover:border-blue-500 transition duration-300 flex flex-col">
+          <!-- Book Cover Container -->
+          <div class="relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 aspect-[3/4]">
+            <img
+              [src]="getCoverUrl(book)"
+              [alt]="book.title"
+              class="w-full h-full object-cover group-hover:scale-110 transition duration-500 ease-out"
+              loading="lazy"
+            />
+            <!-- Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition duration-300 flex items-end p-4">
+              <button class="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition duration-300 glow-button">
+                View Details
+              </button>
+            </div>
+          </div>
+
+          <!-- Book Info -->
+          <div class="flex-1 p-4 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white line-clamp-2 group-hover:text-blue-400 transition duration-300 mb-2">
+                {{ book.title }}
+              </h3>
+              <p *ngIf="book.author_name && book.author_name.length > 0" class="text-xs text-slate-400 line-clamp-1 mb-3">
+                by {{ book.author_name[0] }}
+              </p>
+            </div>
+
+            <!-- Metadata -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-700">
+              <span *ngIf="book.first_publish_year" class="flex items-center gap-1">
+                📅 {{ book.first_publish_year }}
+              </span>
+              <span *ngIf="book.edition_count" class="flex items-center gap-1">
+                📚 {{ book.edition_count }} editions
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div *ngIf="totalPages > 1" class="flex justify-center items-center gap-2 mb-8">
+      <button
+        (click)="goToPage(currentPage - 1)"
+        [disabled]="currentPage === 1"
+        class="px-4 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-300"
+      >
+        ← Prev
+      </button>
+
+      <div class="flex gap-2">
+        <button
+          *ngIf="getPageNumbers()[0] > 1"
+          (click)="goToPage(1)"
+          class="px-3 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300"
+        >
+          1
+        </button>
+        <span *ngIf="getPageNumbers()[0] > 2" class="px-2 py-2 text-slate-500">...</span>
+
+        <button
+          *ngFor="let page of getPageNumbers()"
+          (click)="goToPage(page)"
+          [class.bg-blue-500]="currentPage === page"
+          [class.text-white]="currentPage === page"
+          [class.bg-slate-700/50]="currentPage !== page"
+          [class.text-slate-300]="currentPage !== page"
+          class="px-3 py-2 border border-slate-600 rounded-lg hover:bg-blue-600 transition duration-300"
+        >
+          {{ page }}
+        </button>
+
+        <span *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1" class="px-2 py-2 text-slate-500">...</span>
+        <button
+          *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages"
+          (click)="goToPage(totalPages)"
+          class="px-3 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300"
+        >
+          {{ totalPages }}
+        </button>
+      </div>
+
+      <button
+        (click)="goToPage(currentPage + 1)"
+        [disabled]="currentPage === totalPages"
+        class="px-4 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-300"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+</section>

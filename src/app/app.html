@@ -1,0 +1,5 @@
+<app-loading-screen *ngIf="showLoading"></app-loading-screen>
+
+<div *ngIf="!showLoading" class="animate-fade-in">
+  <router-outlet />
+</div>

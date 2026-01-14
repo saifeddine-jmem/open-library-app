@@ -1,0 +1,1316 @@
+# ANGULAR OPEN LIBRARY APP - COMPLETE IMPLEMENTATION GUIDE
+## For AI Agent - Step-by-Step Instructions
+
+This guide provides complete, production-ready code for building an award-winning Open Library search application using Angular 16+ and Tailwind CSS 3.
+
+---
+
+## SECTION 1: PROJECT SETUP & CONFIGURATION
+
+### Step 1.1: Create Angular Project
+```bash
+ng new open-library-app
+cd open-library-app
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+```
+
+### Step 1.2: Configure Tailwind CSS
+**File: `tailwind.config.js`**
+```javascript
+module.exports = {
+  content: [
+    "./src/**/*.{html,ts}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#0f172a',
+        secondary: '#1e293b',
+        accent: '#3b82f6',
+        'accent-dark': '#1e40af',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.6s ease-in',
+        'slide-up': 'slideUp 0.8s ease-out',
+        'pulse-soft': 'pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(30px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+      },
+    },
+  },
+  plugins: [],
+}
+```
+
+### Step 1.3: Update Global Styles
+**File: `src/styles.css`**
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  min-height: 100vh;
+  color: #e2e8f0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1e40af;
+}
+
+/* Smooth transitions */
+a, button {
+  transition: all 0.3s ease;
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+/* Hover effects */
+.card-hover:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 50px rgba(59, 130, 246, 0.2);
+}
+
+.button-hover:hover {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  transform: translateX(4px);
+}
+```
+
+---
+
+## SECTION 2: MODELS & INTERFACES
+
+### Step 2.1: Create Book Interface
+**File: `src/app/models/book.model.ts`**
+```typescript
+export interface Book {
+  key: string;
+  title: string;
+  edition_count?: number;
+  cover_id?: number;
+  first_publish_year?: number;
+  subtitle?: string;
+  description?: string | { value?: string };
+  author_name?: string[];
+  isbn?: string[];
+}
+
+export interface BooksResponse {
+  works: Book[];
+}
+
+export interface BookDetailsResponse {
+  key: string;
+  title: string;
+  subtitle?: string;
+  first_publish_date?: string;
+  first_publish_year?: number;
+  description?: string | { value?: string };
+  covers?: number[];
+  authors?: Array<{ name: string; key: string }>;
+  number_of_pages?: number;
+  isbn_13?: string[];
+}
+
+export interface SearchFilters {
+  title?: string;
+  year?: number;
+}
+```
+
+---
+
+## SECTION 3: SERVICE IMPLEMENTATION
+
+### Step 3.1: Create Book Service
+**File: `src/app/services/book.service.ts`**
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, BehaviorSubject } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
+import { Book, BooksResponse, BookDetailsResponse } from '../models/book.model';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BookService {
+  private apiUrl = 'https://openlibrary.org';
+  private booksSubject = new BehaviorSubject<Book[]>([]);
+  public books$ = this.booksSubject.asObservable();
+
+  constructor(private http: HttpClient) {}
+
+  /**
+   * Fetch all computer science books
+   * @returns Observable of books
+   */
+  getBooks(): Observable<BooksResponse> {
+    return this.http.get<BooksResponse>(`${this.apiUrl}/subjects/computers.json`).pipe(
+      map(response => ({
+        ...response,
+        works: this.transformBooks(response.works)
+      })),
+      catchError(error => {
+        console.error('Error fetching books:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Search books by title
+   * @param title - Book title to search
+   * @returns Observable of books matching the title
+   */
+  searchByTitle(title: string): Observable<BooksResponse> {
+    const query = title.toLowerCase().replace(/\s+/g, '+');
+    return this.http.get<BooksResponse>(`${this.apiUrl}/search.json?title=${query}`).pipe(
+      map(response => ({
+        ...response,
+        works: this.transformBooks(response.works || [])
+      })),
+      catchError(error => {
+        console.error('Error searching by title:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Search books by publication year
+   * @param year - Publication year
+   * @returns Observable of books from that year
+   */
+  searchByYear(year: number): Observable<BooksResponse> {
+    return this.http.get<BooksResponse>(`${this.apiUrl}/search.json?first_publish_year=${year}`).pipe(
+      map(response => ({
+        ...response,
+        works: this.transformBooks(response.works || [])
+      })),
+      catchError(error => {
+        console.error('Error searching by year:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Combined search by title and year
+   * @param title - Book title
+   * @param year - Publication year
+   * @returns Observable of filtered books
+   */
+  searchByTitleAndYear(title: string, year: number): Observable<BooksResponse> {
+    const query = title.toLowerCase().replace(/\s+/g, '+');
+    return this.http.get<BooksResponse>(
+      `${this.apiUrl}/search.json?title=${query}&first_publish_year=${year}`
+    ).pipe(
+      map(response => ({
+        ...response,
+        works: this.transformBooks(response.works || [])
+      })),
+      catchError(error => {
+        console.error('Error searching by title and year:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Get book details by ID
+   * @param bookId - Book identifier (e.g., /works/OL17365W)
+   * @returns Observable of book details
+   */
+  getBookById(bookId: string): Observable<BookDetailsResponse> {
+    const id = bookId.replace('/works/', '');
+    return this.http.get<BookDetailsResponse>(`${this.apiUrl}/works/${id}.json`).pipe(
+      catchError(error => {
+        console.error('Error fetching book details:', error);
+        throw error;
+      })
+    );
+  }
+
+  /**
+   * Get cover image URL
+   * @param coverId - Cover ID
+   * @param size - Image size (S, M, L)
+   * @returns Cover image URL
+   */
+  getCoverUrl(coverId: number | undefined, size: 'S' | 'M' | 'L' = 'M'): string {
+    if (!coverId) {
+      return 'assets/placeholder-book.png';
+    }
+    return `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`;
+  }
+
+  /**
+   * Transform raw API response to Book interface
+   */
+  private transformBooks(books: any[]): Book[] {
+    return books.map(book => ({
+      key: book.key || '',
+      title: book.title || 'Untitled',
+      edition_count: book.edition_count || 0,
+      cover_id: book.cover_id,
+      first_publish_year: book.first_publish_year,
+      subtitle: book.subtitle || '',
+      description: book.description || '',
+      author_name: book.author_name || []
+    }));
+  }
+
+  /**
+   * Update books subject (for component subscription)
+   */
+  updateBooks(books: Book[]): void {
+    this.booksSubject.next(books);
+  }
+}
+```
+
+### Step 3.2: Update App Module
+**File: `src/app/app.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { HttpClientModule } from '@angular/common/http';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+  ],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    HttpClientModule,
+    FormsModule,
+    ReactiveFormsModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+```
+
+### Step 3.3: Create Routing Module
+**File: `src/app/app-routing.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+
+const routes: Routes = [
+  {
+    path: '',
+    loadChildren: () => import('./pages/home/home.module').then(m => m.HomeModule)
+  },
+  {
+    path: 'book/:id',
+    loadChildren: () => import('./pages/book-details/book-details.module').then(m => m.BookDetailsModule)
+  },
+  { path: '**', redirectTo: '' }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+```
+
+---
+
+## SECTION 4: COMPONENT IMPLEMENTATION
+
+### Step 4.1: Header/Head-Bar Component
+**File: `src/app/components/head-bar/head-bar.component.ts`**
+```typescript
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-head-bar',
+  templateUrl: './head-bar.component.html',
+  styleUrls: ['./head-bar.component.css']
+})
+export class HeadBarComponent {
+  constructor(private router: Router) {}
+
+  goHome(): void {
+    this.router.navigate(['/']);
+  }
+}
+```
+
+**File: `src/app/components/head-bar/head-bar.component.html`**
+```html
+<header class="fixed top-0 left-0 right-0 z-50 glass-dark border-b border-slate-700">
+  <nav class="container mx-auto px-6 py-4 flex items-center justify-between">
+    <!-- Logo & Title -->
+    <div (click)="goHome()" class="flex items-center gap-3 cursor-pointer group">
+      <div class="relative">
+        <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-lg blur opacity-75 group-hover:opacity-100 transition duration-300"></div>
+        <div class="relative px-3 py-2 bg-primary rounded-lg">
+          <span class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
+            📚
+          </span>
+        </div>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-white tracking-tight">OpenLibrary</h1>
+        <p class="text-xs text-slate-400">Explore Knowledge</p>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="hidden md:flex gap-8 items-center">
+      <a href="#featured" class="text-slate-300 hover:text-blue-400 transition duration-300 text-sm font-medium">
+        Featured
+      </a>
+      <a href="#search" class="text-slate-300 hover:text-blue-400 transition duration-300 text-sm font-medium">
+        Search
+      </a>
+      <button class="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 text-primary font-semibold rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition duration-300">
+        GitHub
+      </button>
+    </nav>
+  </nav>
+</header>
+```
+
+### Step 4.2: Search Bar Component
+**File: `src/app/components/search-bar/search-bar.component.ts`**
+```typescript
+import { Component, Output, EventEmitter, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { BookService } from '../../services/book.service';
+
+@Component({
+  selector: 'app-search-bar',
+  templateUrl: './search-bar.component.html',
+  styleUrls: ['./search-bar.component.css']
+})
+export class SearchBarComponent implements OnInit {
+  @Output() searchTriggered = new EventEmitter<any>();
+
+  searchForm: FormGroup;
+  isLoading = false;
+  searchType: 'all' | 'title' | 'year' | 'combined' = 'all';
+
+  constructor(
+    private fb: FormBuilder,
+    private bookService: BookService
+  ) {
+    this.searchForm = this.fb.group({
+      title: ['', [Validators.minLength(2)]],
+      year: ['', [Validators.pattern(/^\d{4}$/)]]
+    });
+  }
+
+  ngOnInit(): void {}
+
+  performSearch(): void {
+    const { title, year } = this.searchForm.value;
+
+    if (!title && !year) {
+      this.loadDefaultBooks();
+      return;
+    }
+
+    this.isLoading = true;
+
+    let searchObservable;
+
+    if (title && year) {
+      searchObservable = this.bookService.searchByTitleAndYear(title, year);
+    } else if (title) {
+      searchObservable = this.bookService.searchByTitle(title);
+    } else if (year) {
+      searchObservable = this.bookService.searchByYear(year);
+    }
+
+    searchObservable?.subscribe({
+      next: (data) => {
+        this.searchTriggered.emit(data.works);
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Search error:', error);
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadDefaultBooks(): void {
+    this.isLoading = true;
+    this.bookService.getBooks().subscribe({
+      next: (data) => {
+        this.searchTriggered.emit(data.works);
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading books:', error);
+        this.isLoading = false;
+      }
+    });
+  }
+
+  resetSearch(): void {
+    this.searchForm.reset();
+    this.loadDefaultBooks();
+  }
+
+  onKeyPress(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      this.performSearch();
+    }
+  }
+}
+```
+
+**File: `src/app/components/search-bar/search-bar.component.html`**
+```html
+<section class="py-12 px-6" id="search">
+  <div class="container mx-auto max-w-4xl">
+    <div class="glass rounded-2xl p-8 border border-slate-700">
+      <!-- Header -->
+      <div class="mb-8">
+        <h2 class="text-3xl font-bold text-white mb-2">Discover Books</h2>
+        <p class="text-slate-400">Search by title, year, or explore our curated collection</p>
+      </div>
+
+      <!-- Search Form -->
+      <form [formGroup]="searchForm" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Title Search -->
+          <div class="relative group">
+            <label class="block text-sm font-semibold text-slate-300 mb-3">
+              Book Title
+            </label>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                📖
+              </span>
+              <input
+                formControlName="title"
+                type="text"
+                placeholder="Enter book title..."
+                (keypress)="onKeyPress($event)"
+                class="w-full pl-12 pr-4 py-3 bg-secondary/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-300"
+              />
+            </div>
+          </div>
+
+          <!-- Year Search -->
+          <div class="relative group">
+            <label class="block text-sm font-semibold text-slate-300 mb-3">
+              Publication Year
+            </label>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                📅
+              </span>
+              <input
+                formControlName="year"
+                type="text"
+                placeholder="e.g., 2023"
+                (keypress)="onKeyPress($event)"
+                class="w-full pl-12 pr-4 py-3 bg-secondary/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition duration-300"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-4 pt-4">
+          <button
+            type="button"
+            (click)="performSearch()"
+            [disabled]="isLoading"
+            class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-400 text-primary font-semibold rounded-xl hover:shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition duration-300 flex items-center justify-center gap-2"
+          >
+            <span *ngIf="!isLoading">🔍 Search</span>
+            <span *ngIf="isLoading" class="animate-spin">⏳</span>
+          </button>
+          <button
+            type="button"
+            (click)="resetSearch()"
+            [disabled]="isLoading"
+            class="px-6 py-3 bg-slate-700/50 border border-slate-600 text-slate-300 font-semibold rounded-xl hover:bg-slate-700 hover:border-slate-500 transition duration-300"
+          >
+            Reset
+          </button>
+        </div>
+      </form>
+
+      <!-- Loading State -->
+      <div *ngIf="isLoading" class="mt-6 text-center text-slate-400">
+        <p class="animate-pulse">Searching for books...</p>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+### Step 4.3: Book List Component
+**File: `src/app/components/book-list/book-list.component.ts`**
+```typescript
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Router } from '@angular/router';
+import { BookService } from '../../services/book.service';
+import { Book } from '../../models/book.model';
+
+@Component({
+  selector: 'app-book-list',
+  templateUrl: './book-list.component.html',
+  styleUrls: ['./book-list.component.css']
+})
+export class BookListComponent implements OnChanges {
+  @Input() books: Book[] = [];
+
+  booksList: Book[] = [];
+  filteredBooks: Book[] = [];
+  currentPage = 1;
+  itemsPerPage = 12;
+  totalPages = 0;
+
+  constructor(
+    private router: Router,
+    private bookService: BookService
+  ) {}
+
+  ngOnInit(): void {
+    this.loadDefaultBooks();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['books']) {
+      this.booksList = this.books || [];
+      this.currentPage = 1;
+      this.updatePagination();
+    }
+  }
+
+  loadDefaultBooks(): void {
+    this.bookService.getBooks().subscribe({
+      next: (data) => {
+        this.booksList = data.works;
+        this.updatePagination();
+      },
+      error: (error) => {
+        console.error('Error loading books:', error);
+      }
+    });
+  }
+
+  updatePagination(): void {
+    this.totalPages = Math.ceil(this.booksList.length / this.itemsPerPage);
+    this.updateFilteredBooks();
+  }
+
+  updateFilteredBooks(): void {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    this.filteredBooks = this.booksList.slice(startIndex, endIndex);
+  }
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      this.updateFilteredBooks();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  viewBookDetails(book: Book): void {
+    if (book.key) {
+      this.router.navigate(['/book', book.key]);
+    }
+  }
+
+  getCoverUrl(book: Book): string {
+    return this.bookService.getCoverUrl(book.cover_id);
+  }
+
+  getPageNumbers(): number[] {
+    const pages = [];
+    const maxPages = 5;
+    let startPage = Math.max(1, this.currentPage - 2);
+    let endPage = Math.min(this.totalPages, startPage + maxPages - 1);
+
+    if (endPage - startPage < maxPages - 1) {
+      startPage = Math.max(1, endPage - maxPages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }
+}
+```
+
+**File: `src/app/components/book-list/book-list.component.html`**
+```html
+<section class="py-16 px-6">
+  <div class="container mx-auto">
+    <!-- Section Header -->
+    <div class="mb-12 text-center" *ngIf="filteredBooks.length > 0">
+      <h2 class="text-4xl font-bold text-white mb-3">Featured Books</h2>
+      <p class="text-slate-400">
+        Showing <span class="text-blue-400 font-semibold">{{ filteredBooks.length }}</span> of
+        <span class="text-blue-400 font-semibold">{{ booksList.length }}</span> books
+      </p>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="filteredBooks.length === 0" class="text-center py-16">
+      <p class="text-2xl text-slate-400 mb-4">📭 No books found</p>
+      <p class="text-slate-500">Try adjusting your search criteria</p>
+    </div>
+
+    <!-- Books Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+      <div
+        *ngFor="let book of filteredBooks; let i = index"
+        (click)="viewBookDetails(book)"
+        class="group cursor-pointer h-full animate-slide-up"
+        [style.animation-delay]="(i * 50) + 'ms'"
+      >
+        <div class="h-full bg-secondary/30 border border-slate-700 rounded-xl overflow-hidden hover:border-blue-500 transition duration-300 flex flex-col">
+          <!-- Book Cover Container -->
+          <div class="relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 aspect-[3/4]">
+            <img
+              [src]="getCoverUrl(book)"
+              [alt]="book.title"
+              class="w-full h-full object-cover group-hover:scale-110 transition duration-500 ease-out"
+              loading="lazy"
+            />
+            <!-- Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition duration-300 flex items-end p-4">
+              <button class="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition duration-300">
+                View Details
+              </button>
+            </div>
+          </div>
+
+          <!-- Book Info -->
+          <div class="flex-1 p-4 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white line-clamp-2 group-hover:text-blue-400 transition duration-300 mb-2">
+                {{ book.title }}
+              </h3>
+              <p *ngIf="book.author_name && book.author_name.length > 0" class="text-xs text-slate-400 line-clamp-1 mb-3">
+                by {{ book.author_name[0] }}
+              </p>
+            </div>
+
+            <!-- Metadata -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-700">
+              <span *ngIf="book.first_publish_year" class="flex items-center gap-1">
+                📅 {{ book.first_publish_year }}
+              </span>
+              <span *ngIf="book.edition_count" class="flex items-center gap-1">
+                📚 {{ book.edition_count }} editions
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div *ngIf="totalPages > 1" class="flex justify-center items-center gap-2 mb-8">
+      <button
+        (click)="goToPage(currentPage - 1)"
+        [disabled]="currentPage === 1"
+        class="px-4 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-300"
+      >
+        ← Prev
+      </button>
+
+      <div class="flex gap-2">
+        <button
+          *ngIf="getPageNumbers()[0] > 1"
+          (click)="goToPage(1)"
+          class="px-3 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300"
+        >
+          1
+        </button>
+        <span *ngIf="getPageNumbers()[0] > 2" class="px-2 py-2 text-slate-500">...</span>
+
+        <button
+          *ngFor="let page of getPageNumbers()"
+          (click)="goToPage(page)"
+          [class.bg-blue-500]="page === currentPage"
+          [class.border-blue-500]="page === currentPage"
+          [class.bg-slate-700/50]="page !== currentPage"
+          [class.border-slate-600]="page !== currentPage"
+          class="px-3 py-2 border text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300"
+        >
+          {{ page }}
+        </button>
+
+        <span *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1" class="px-2 py-2 text-slate-500">...</span>
+        <button
+          *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages"
+          (click)="goToPage(totalPages)"
+          class="px-3 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300"
+        >
+          {{ totalPages }}
+        </button>
+      </div>
+
+      <button
+        (click)="goToPage(currentPage + 1)"
+        [disabled]="currentPage === totalPages"
+        class="px-4 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-300"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+</section>
+```
+
+### Step 4.4: Book Details Component
+**File: `src/app/pages/book-details/book-details.component.ts`**
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookService } from '../../services/book.service';
+import { BookDetailsResponse } from '../../models/book.model';
+
+@Component({
+  selector: 'app-book-details',
+  templateUrl: './book-details.component.html',
+  styleUrls: ['./book-details.component.css']
+})
+export class BookDetailsComponent implements OnInit {
+  book: BookDetailsResponse | null = null;
+  isLoading = true;
+  error: string | null = null;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private bookService: BookService
+  ) {}
+
+  ngOnInit(): void {
+    this.route.params.subscribe(params => {
+      const bookId = params['id'];
+      if (bookId) {
+        this.loadBookDetails(bookId);
+      }
+    });
+  }
+
+  loadBookDetails(bookId: string): void {
+    this.isLoading = true;
+    this.error = null;
+
+    this.bookService.getBookById(bookId).subscribe({
+      next: (data) => {
+        this.book = data;
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading book details:', error);
+        this.error = 'Failed to load book details. Please try again.';
+        this.isLoading = false;
+      }
+    });
+  }
+
+  getDescription(): string {
+    if (!this.book?.description) {
+      return 'No description available';
+    }
+
+    if (typeof this.book.description === 'string') {
+      return this.book.description;
+    }
+
+    if (typeof this.book.description === 'object' && 'value' in this.book.description) {
+      return this.book.description.value || 'No description available';
+    }
+
+    return 'No description available';
+  }
+
+  getCoverUrl(): string {
+    if (this.book?.covers && this.book.covers.length > 0) {
+      return this.bookService.getCoverUrl(this.book.covers[0], 'L');
+    }
+    return 'assets/placeholder-book.png';
+  }
+
+  goBack(): void {
+    this.router.navigate(['/']);
+  }
+
+  getAuthorsString(): string {
+    if (!this.book?.authors) {
+      return 'Unknown Author';
+    }
+    return this.book.authors.map(a => a.name).join(', ');
+  }
+}
+```
+
+**File: `src/app/pages/book-details/book-details.component.html`**
+```html
+<!-- Header -->
+<app-head-bar></app-head-bar>
+
+<main class="min-h-screen pt-20 pb-12 px-6">
+  <div class="container mx-auto max-w-5xl">
+    <!-- Back Button -->
+    <button
+      (click)="goBack()"
+      class="mb-8 px-4 py-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition duration-300 flex items-center gap-2"
+    >
+      ← Back to Books
+    </button>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="text-center py-16">
+      <div class="animate-spin text-4xl mb-4">⏳</div>
+      <p class="text-slate-400">Loading book details...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="error" class="bg-red-500/10 border border-red-500/50 rounded-xl p-6 text-center">
+      <p class="text-red-400">{{ error }}</p>
+    </div>
+
+    <!-- Book Details -->
+    <div *ngIf="!isLoading && book && !error" class="glass rounded-2xl p-8 border border-slate-700 animate-fade-in">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Book Cover -->
+        <div class="md:col-span-1">
+          <div class="relative group">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+            <img
+              [src]="getCoverUrl()"
+              [alt]="book.title"
+              class="relative w-full aspect-[3/4] object-cover rounded-xl shadow-2xl"
+            />
+          </div>
+
+          <!-- Quick Info -->
+          <div class="mt-6 space-y-3 text-sm">
+            <div class="flex items-center gap-2 text-slate-400">
+              <span>📅</span>
+              <span>{{ book.first_publish_year || 'Unknown' }}</span>
+            </div>
+            <div *ngIf="book.number_of_pages" class="flex items-center gap-2 text-slate-400">
+              <span>📖</span>
+              <span>{{ book.number_of_pages }} pages</span>
+            </div>
+            <div *ngIf="book.isbn_13 && book.isbn_13.length > 0" class="flex items-start gap-2 text-slate-400">
+              <span>🔍</span>
+              <span class="break-all text-xs">ISBN: {{ book.isbn_13[0] }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Book Info -->
+        <div class="md:col-span-2">
+          <!-- Title & Subtitle -->
+          <div class="mb-6">
+            <h1 class="text-4xl font-bold text-white mb-2 leading-tight">
+              {{ book.title }}
+            </h1>
+            <p *ngIf="book.subtitle" class="text-xl text-slate-300 text-opacity-80">
+              {{ book.subtitle }}
+            </p>
+          </div>
+
+          <!-- Author -->
+          <div class="mb-6 pb-6 border-b border-slate-700">
+            <p class="text-slate-400 text-sm mb-2">Author(s)</p>
+            <p class="text-lg text-blue-400 font-semibold">
+              {{ getAuthorsString() }}
+            </p>
+          </div>
+
+          <!-- Description -->
+          <div class="mb-8">
+            <h2 class="text-xl font-bold text-white mb-4">About This Book</h2>
+            <div class="prose prose-invert max-w-none">
+              <p class="text-slate-300 leading-relaxed whitespace-pre-wrap text-justify">
+                {{ getDescription() }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-4 pt-6 border-t border-slate-700">
+            <a
+              [href]="'https://openlibrary.org' + book.key"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-400 text-primary font-semibold rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition duration-300 text-center"
+            >
+              Read on OpenLibrary
+            </a>
+            <button
+              (click)="goBack()"
+              class="px-6 py-3 bg-slate-700/50 border border-slate-600 text-slate-300 font-semibold rounded-lg hover:bg-slate-700 transition duration-300"
+            >
+              Explore More
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+```
+
+### Step 4.5: Home Page Module
+**File: `src/app/pages/home/home.component.ts`**
+```typescript
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-home',
+  templateUrl: './home.component.html',
+  styleUrls: ['./home.component.css']
+})
+export class HomeComponent {
+  books: any[] = [];
+
+  onSearchTriggered(results: any[]): void {
+    this.books = results;
+  }
+}
+```
+
+**File: `src/app/pages/home/home.component.html`**
+```html
+<!-- Header -->
+<app-head-bar></app-head-bar>
+
+<main>
+  <!-- Hero Section -->
+  <section class="min-h-screen flex items-center justify-center px-6 pt-16">
+    <div class="text-center max-w-4xl mx-auto">
+      <!-- Animated Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-full mb-6 animate-fade-in">
+        <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+        <span class="text-sm text-blue-400">Powered by OpenLibrary API</span>
+      </div>
+
+      <!-- Main Heading -->
+      <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight animate-slide-up">
+        Explore <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500">Unlimited Knowledge</span>
+      </h1>
+
+      <!-- Subheading -->
+      <p class="text-xl text-slate-400 mb-12 leading-relaxed animate-slide-up" style="animation-delay: 100ms">
+        Discover millions of books across every subject imaginable. Search, explore, and dive deep into the world of literature with our powerful book discovery platform.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-slide-up" style="animation-delay: 200ms">
+        <a
+          href="#search"
+          class="px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-400 text-primary font-bold rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition duration-300 text-center"
+        >
+          Start Searching
+        </a>
+        <a
+          href="https://github.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="px-8 py-4 bg-slate-700/50 border border-slate-600 text-slate-300 font-bold rounded-lg hover:bg-slate-700 transition duration-300 text-center"
+        >
+          View on GitHub
+        </a>
+      </div>
+
+      <!-- Floating Stats -->
+      <div class="grid grid-cols-3 gap-4 md:gap-8 text-center animate-fade-in" style="animation-delay: 300ms">
+        <div class="glass rounded-lg p-4 md:p-6 border border-slate-700">
+          <p class="text-3xl md:text-4xl font-bold text-blue-400">2.5M+</p>
+          <p class="text-xs md:text-sm text-slate-400 mt-2">Books Available</p>
+        </div>
+        <div class="glass rounded-lg p-4 md:p-6 border border-slate-700">
+          <p class="text-3xl md:text-4xl font-bold text-cyan-400">190+</p>
+          <p class="text-xs md:text-sm text-slate-400 mt-2">Countries</p>
+        </div>
+        <div class="glass rounded-lg p-4 md:p-6 border border-slate-700">
+          <p class="text-3xl md:text-4xl font-bold text-blue-400">100%</p>
+          <p class="text-xs md:text-sm text-slate-400 mt-2">Free API</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Search Section -->
+  <app-search-bar (searchTriggered)="onSearchTriggered($event)"></app-search-bar>
+
+  <!-- Books Grid -->
+  <app-book-list [books]="books"></app-book-list>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-700 py-8 px-6 mt-16">
+    <div class="container mx-auto text-center text-slate-500 text-sm">
+      <p>Built with ❤️ using Angular 16+ & Tailwind CSS 3</p>
+      <p class="mt-2">© 2026 OpenLibrary Explorer. All rights reserved.</p>
+    </div>
+  </footer>
+</main>
+```
+
+**File: `src/app/pages/home/home.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HomeRoutingModule } from './home-routing.module';
+import { HomeComponent } from './home.component';
+import { HeadBarComponent } from '../../components/head-bar/head-bar.component';
+import { SearchBarComponent } from '../../components/search-bar/search-bar.component';
+import { BookListComponent } from '../../components/book-list/book-list.component';
+import { ReactiveFormsModule } from '@angular/forms';
+
+@NgModule({
+  declarations: [HomeComponent, HeadBarComponent, SearchBarComponent, BookListComponent],
+  imports: [CommonModule, HomeRoutingModule, ReactiveFormsModule]
+})
+export class HomeModule { }
+```
+
+---
+
+## SECTION 5: MODULE FOR BOOK DETAILS PAGE
+
+**File: `src/app/pages/book-details/book-details.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { BookDetailsRoutingModule } from './book-details-routing.module';
+import { BookDetailsComponent } from './book-details.component';
+import { HeadBarComponent } from '../../components/head-bar/head-bar.component';
+
+@NgModule({
+  declarations: [BookDetailsComponent, HeadBarComponent],
+  imports: [CommonModule, BookDetailsRoutingModule]
+})
+export class BookDetailsModule { }
+```
+
+---
+
+## SECTION 6: ROUTING CONFIGURATION
+
+**File: `src/app/pages/home/home-routing.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { HomeComponent } from './home.component';
+
+const routes: Routes = [
+  { path: '', component: HomeComponent }
+];
+
+@NgModule({
+  imports: [RouterModule.forChild(routes)],
+  exports: [RouterModule]
+})
+export class HomeRoutingModule { }
+```
+
+**File: `src/app/pages/book-details/book-details-routing.module.ts`**
+```typescript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { BookDetailsComponent } from './book-details.component';
+
+const routes: Routes = [
+  { path: '', component: BookDetailsComponent }
+];
+
+@NgModule({
+  imports: [RouterModule.forChild(routes)],
+  exports: [RouterModule]
+})
+export class BookDetailsRoutingModule { }
+```
+
+---
+
+## SECTION 7: DEPLOYMENT & GITHUB PAGES
+
+### Step 7.1: Prepare for GitHub Pages
+```bash
+# Install Angular CLI for GitHub Pages deployment
+ng add angular-cli-ghpages
+
+# Or manually update angular.json
+```
+
+**Update `angular.json`:**
+```json
+{
+  "projects": {
+    "open-library-app": {
+      "architect": {
+        "build": {
+          "options": {
+            "baseHref": "/open-library-app/",
+            "outputPath": "dist/open-library-app"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Step 7.2: Build & Deploy
+```bash
+# Build for production
+ng build --configuration production
+
+# Deploy to GitHub Pages
+npx angular-cli-ghpages --dir=dist/open-library-app
+```
+
+---
+
+## SECTION 8: DESIGN GUIDELINES FOR AI AGENT
+
+### Visual Hierarchy
+- **Primary CTA**: Blue gradient with shadow effect
+- **Secondary CTA**: Slate-700 with border
+- **Hover States**: Scale + shadow elevation
+- **Transitions**: 300ms ease for smooth animations
+
+### Color Palette
+- **Background**: #0f172a (primary), #1e293b (secondary)
+- **Accent**: #3b82f6 (blue), #06b6d4 (cyan)
+- **Text**: #f1f5f9 (primary), #cbd5e1 (secondary), #94a3b8 (muted)
+- **Borders**: rgba(100, 116, 139, 0.2)
+
+### Animation Strategy
+- **Entry**: `animate-fade-in` for page loads
+- **Cards**: `animate-slide-up` with staggered delays
+- **Interactions**: Smooth `transition duration-300`
+- **Micro-interactions**: Hover scale/shadow effects
+
+### Responsive Design
+- **Mobile-first** approach
+- **Breakpoints**: sm (640px), md (768px), lg (1024px), xl (1280px)
+- **Grid**: Adapts from 1 column (mobile) to 4 columns (desktop)
+
+### Accessibility
+- Semantic HTML structure
+- ARIA labels where needed
+- Sufficient color contrast
+- Keyboard navigation support
+- Loading/error states clearly indicated
+
+---
+
+## COMPLETE QUICK START
+
+```bash
+# 1. Create project
+ng new open-library-app
+cd open-library-app
+
+# 2. Install Tailwind
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# 3. Copy all provided code files
+
+# 4. Install dependencies
+npm install
+
+# 5. Generate components
+ng generate component components/head-bar --skip-tests
+ng generate component components/search-bar --skip-tests
+ng generate component components/book-list --skip-tests
+ng generate component pages/home --skip-tests
+ng generate component pages/book-details --skip-tests
+ng generate service services/book --skip-tests
+
+# 6. Copy provided TypeScript/HTML/CSS files
+
+# 7. Run dev server
+ng serve --open
+
+# 8. Build for production
+ng build --configuration production
+
+# 9. Deploy to GitHub Pages
+npx angular-cli-ghpages --dir=dist/open-library-app
+```
+
+---
+
+**This comprehensive guide provides everything needed for an AI agent to implement a production-ready, award-winning quality Angular application.**
+

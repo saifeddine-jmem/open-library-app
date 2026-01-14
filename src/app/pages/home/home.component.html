@@ -1,0 +1,35 @@
+<div class="min-h-screen">
+  <!-- Header -->
+  <app-head-bar></app-head-bar>
+
+  <!-- Main Content -->
+  <main class="pt-24">
+    <!-- Hero Section -->
+    <section class="py-16 px-6">
+      <div class="container mx-auto text-center">
+        <h1 class="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 mb-6 animate-fade-in drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" id="featured">
+          Discover Your Next Book
+        </h1>
+        <p class="text-xl text-slate-300 mb-8 max-w-2xl mx-auto animate-slide-up">
+          Explore millions of books from the Open Library collection. Search by title, year, or browse our featured selection.
+        </p>
+      </div>
+    </section>
+
+    <!-- Search Section -->
+    <app-search-bar (searchTriggered)="onSearchTriggered($event)"></app-search-bar>
+
+    <!-- Book List Section -->
+    <app-book-list [books]="searchResults"></app-book-list>
+  </main>
+
+  <!-- Footer -->
+  <footer class="glass-dark border-t border-slate-700 py-8 mt-16">
+    <div class="container mx-auto px-6 text-center">
+      <p class="text-slate-400">
+        Powered by <a href="https://openlibrary.org" target="_blank" class="text-blue-400 hover:text-blue-300 transition">Open Library</a>
+      </p>
+      <p class="text-slate-500 text-sm mt-2">© 2026 OpenLibrary App. Built with Angular & Tailwind CSS.</p>
+    </div>
+  </footer>
+</div>
